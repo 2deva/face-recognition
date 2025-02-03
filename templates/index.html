@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Facial Recognition Web App</title>
+
+    <!-- Google Fonts for Modern Look -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #f0f2f5;
+            color: #333;
+        }
+
+        /* Centering the entire content */
+        .container {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+            color: #333;
+            font-weight: 600;
+        }
+
+        .content {
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            gap: 20px;
+            width: 100%;
+            max-width: 900px;
+        }
+
+        .video-container {
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
+            padding: 10px;
+            background-color: #fff;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* Video stream container styling */
+        img {
+            width: 100%;
+            max-width: 400px; /* Adjust the max-width */
+            height: auto;
+            display: block;
+            border-radius: 10px;
+        }
+
+        /* Form styling */
+        form {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            max-width: 400px;
+            margin-top: 20px;
+        }
+
+        label {
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+
+        input[type="text"] {
+            padding: 10px;
+            font-size: 16px;
+            width: 100%;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            transition: border-color 0.3s ease;
+        }
+
+        input[type="text"]:focus {
+            border-color: #4CAF50;
+            outline: none;
+        }
+
+        /* Button styling */
+        button {
+            padding: 12px 30px;
+            font-size: 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        /* Table styling */
+        .table-container {
+            flex: 1;
+            max-width: 500px;
+            overflow-y: auto;
+            max-height: 600px; /* Adjust the max-height as needed */
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            background-color: #fff;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background-color: #fff;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        th {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+
+        /* Responsive Design for smaller devices */
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 24px;
+            }
+
+            .content {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .video-container img {
+                width: 100%;
+            }
+
+            form {
+                width: 90%;
+            }
+
+            .table-container {
+                max-width: 90%;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Facial Recognition Attendance</h1>
+        <div class="content">
+            <div class="video-container">
+                <!-- Live Video Stream -->
+                <img src="{{ url_for('video_feed') }}" alt="Video Stream">
+                <!-- Form for registering new faces -->
+                <form action="{{ url_for('register_face') }}" method="POST">
+                    <label for="name">Register New Face:</label>
+                    <input type="text" name="name" placeholder="Enter your name" required>
+                    <button type="submit">Register</button>
+                </form>
+            </div>
+
+            <div class="table-container">
+                <!-- Table for displaying detected names -->
+                <table id="attendance-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Timestamp</th>
+                            <th>Confidence</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Rows will be added here dynamically -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const displayedNames = new Set();
+
+        function updateAttendanceTable(name, confidence) {
+            if (displayedNames.has(name)) return;
+
+            const table = document.getElementById('attendance-table').getElementsByTagName('tbody')[0];
+            const newRow = table.insertRow();
+            const nameCell = newRow.insertCell(0);
+            const timestampCell = newRow.insertCell(1);
+            const confidenceCell = newRow.insertCell(2);
+            nameCell.textContent = name;
+            timestampCell.textContent = new Date().toLocaleString();
+            confidenceCell.textContent = (confidence * 100).toFixed(2) + '%';
+            displayedNames.add(name);
+        }
+
+        function fetchDetectedNames() {
+            fetch('/detected_names')
+                .then(response => response.json())
+                .then(data => {
+                    data.names.forEach(([name, confidence]) => {
+                        updateAttendanceTable(name, confidence);
+                    });
+                })
+                .catch(error => console.error('Error fetching detected names:', error));
+        }
+
+        // Fetch detected names every 5 seconds
+        setInterval(fetchDetectedNames, 5000);
+    </script>
+</body>
+</html>
